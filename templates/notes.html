@@ -1,1 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NyayaMitra – Secure Notes</title>
+</head>
+<body>
 
+<h2>🔐 Private Case Notes (AI Sentiment)</h2>
+
+<!-- ADD NOTE -->
+<form method="POST" action="/add-note">
+    <input type="text" name="case_id" placeholder="Enter Case ID" required><br><br>
+    <textarea name="note" placeholder="Write private note..." required></textarea><br><br>
+    <button type="submit">Save Note</button>
+</form>
+
+<br>
+
+<!-- VIEW NOTES -->
+<form method="GET" action="/view">
+    <input type="text" name="case_id" placeholder="Enter Case ID to view" required>
+    <button type="submit">View Notes</button>
+</form>
+
+<!-- LOCK -->
+<form method="GET" action="/lock" style="margin-top:10px;">
+    <button type="submit">🔒 Lock Notes</button>
+</form>
+
+<hr>
+
+<h3>Saved Notes</h3>
+
+{% for n in notes %}
+<div>
+    <p>{{ n.note }}</p>
+    <small>{{ n.time }}</small><br>
+
+    {% if n.sentiment == "Positive" %}
+        <span style="color:green">😊 Positive</span>
+    {% elif n.sentiment == "Negative" %}
+        <span style="color:red">⚠️ Negative</span>
+    {% else %}
+        <span style="color:gray">😐 Neutral</span>
+    {% endif %}
+</div>
+<hr>
+{% endfor %}
+
+</body>
+</html>
