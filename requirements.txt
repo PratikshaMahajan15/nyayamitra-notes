@@ -1,0 +1,4 @@
+flask
+textblob
+cryptography
+gunicorn
