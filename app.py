@@ -68,7 +68,7 @@ def init_db():
 
 init_db()
 
-# ---------------- ROUTES (UI) ----------------
+# ---------------- UI ROUTES ----------------
 
 @app.route("/")
 def home():
@@ -129,7 +129,7 @@ def lock_notes():
     session.pop("unlocked", None)
     return redirect("/")
 
-# ---------------- ROUTES (JSON API) ----------------
+# ---------------- JSON API ----------------
 
 @app.route("/api/notes/<cnr>")
 def api_notes(cnr):
@@ -159,9 +159,36 @@ def api_notes(cnr):
         "notes": notes
     })
 
+# ---------------- DOCS ----------------
+
+@app.route("/docs")
+def docs():
+    return jsonify({
+        "service": "NyayaMitra Secure Notes API",
+        "base_url": "https://nyayamitra-notes.onrender.com",
+        "description": "Encrypted case notes with AI-based sentiment analysis",
+        "endpoints": {
+            "/": "UI to add and view private case notes",
+            "/api/notes/{CNR}": {
+                "method": "GET",
+                "description": "Returns all notes for a given CNR in JSON",
+                "example": {
+                    "cnr_number": "KAHC010000242018",
+                    "total_notes": 1,
+                    "notes": [
+                        {
+                            "note": "Opposite party delaying intentionally",
+                            "sentiment": "Negative",
+                            "timestamp": "YYYY-MM-DD HH:MM:SS"
+                        }
+                    ]
+                }
+            },
+            "/lock": "Locks notes using session security"
+        }
+    })
+
 # ---------------- RUN ----------------
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
-
-
