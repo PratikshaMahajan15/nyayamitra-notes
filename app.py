@@ -1,13 +1,13 @@
-from flask import Flask, request, render_template, redirect, session
+from flask import Flask, request, render_template, redirect, session, jsonify
 import sqlite3
 from textblob import TextBlob
 from cryptography.fernet import Fernet
 import os
 
 app = Flask(__name__)
-app.secret_key = "nyayamitra_lock_key"  # required for lock/session
+app.secret_key = "nyayamitra_lock_key"
 
-# ---------------- ENCRYPTION (STABLE KEY) ----------------
+# ---------------- ENCRYPTION ----------------
 
 KEY_FILE = "secret.key"
 
@@ -42,7 +42,6 @@ def get_sentiment(note):
             return "Negative"
 
     polarity = TextBlob(note).sentiment.polarity
-
     if polarity > 0.2:
         return "Positive"
     elif polarity < -0.2:
@@ -58,9 +57,7 @@ def init_db():
     cur.execute("""
         CREATE TABLE IF NOT EXISTS case_notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            case_id TEXT,
-            user_id INTEGER,
-            user_role TEXT,
+            cnr_number TEXT,
             encrypted_note TEXT,
             sentiment TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -71,20 +68,16 @@ def init_db():
 
 init_db()
 
-# ---------------- ROUTES ----------------
+# ---------------- ROUTES (UI) ----------------
 
 @app.route("/")
 def home():
-    # if locked, do not show notes
     return render_template("notes.html", notes=[])
 
 @app.route("/add-note", methods=["POST"])
 def add_note():
-    case_id = request.form["case_id"]
+    cnr = request.form["cnr"]
     note = request.form["note"]
-
-    user_id = 1
-    user_role = "Judge"
 
     encrypted_note = encrypt_text(note)
     sentiment = get_sentiment(note)
@@ -92,35 +85,33 @@ def add_note():
     conn = sqlite3.connect("database.db")
     cur = conn.cursor()
     cur.execute("""
-        INSERT INTO case_notes
-        (case_id, user_id, user_role, encrypted_note, sentiment)
-        VALUES (?, ?, ?, ?, ?)
-    """, (case_id, user_id, user_role, encrypted_note, sentiment))
+        INSERT INTO case_notes (cnr_number, encrypted_note, sentiment)
+        VALUES (?, ?, ?)
+    """, (cnr, encrypted_note, sentiment))
     conn.commit()
     conn.close()
 
     return redirect("/")
 
 @app.route("/view")
-def redirect_to_notes():
-    case_id = request.args.get("case_id")
-    session["unlocked"] = True   # unlock notes
-    return redirect(f"/notes/{case_id}")
+def view_redirect():
+    cnr = request.args.get("cnr")
+    session["unlocked"] = True
+    return redirect(f"/notes/{cnr}")
 
-@app.route("/notes/<case_id>")
-def view_notes(case_id):
+@app.route("/notes/<cnr>")
+def view_notes(cnr):
     if not session.get("unlocked"):
         return redirect("/")
 
-    user_id = 1
     conn = sqlite3.connect("database.db")
     cur = conn.cursor()
     cur.execute("""
         SELECT encrypted_note, sentiment, created_at
         FROM case_notes
-        WHERE case_id=? AND user_id=?
+        WHERE cnr_number=?
         ORDER BY created_at DESC
-    """, (case_id, user_id))
+    """, (cnr,))
 
     notes = []
     for row in cur.fetchall():
@@ -138,6 +129,39 @@ def lock_notes():
     session.pop("unlocked", None)
     return redirect("/")
 
+# ---------------- ROUTES (JSON API) ----------------
+
+@app.route("/api/notes/<cnr>")
+def api_notes(cnr):
+    conn = sqlite3.connect("database.db")
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT encrypted_note, sentiment, created_at
+        FROM case_notes
+        WHERE cnr_number=?
+        ORDER BY created_at DESC
+    """, (cnr,))
+
+    notes = []
+    for row in cur.fetchall():
+        notes.append({
+            "note": decrypt_text(row[0]),
+            "sentiment": row[1],
+            "timestamp": row[2]
+        })
+
+    conn.close()
+
+    return jsonify({
+        "cnr_number": cnr,
+        "total_notes": len(notes),
+        "notes": notes
+    })
+
+# ---------------- RUN ----------------
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
 
